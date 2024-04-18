@@ -24,6 +24,7 @@ library(knitr)
 library(tibble)
 library(stats)
 library(broom)
+library(arrow)
 ```
 
 # Introduction
@@ -421,8 +422,8 @@ selected_columns <- c("totalPrice", "price", "square", "floor", "buildingType", 
 new_data <- data[, selected_columns, drop = FALSE]
 
 
-# Write the processed data back to new CSV files using appropriate paths
-write_csv(new_data, "/cloud/project/data/analysis_data/new_house_price.csv")
+# Write the processed data 
+write_parquet(new_data, "/cloud/project/data/analysis_data/new_house_price.parquet")
 
 ```
 
