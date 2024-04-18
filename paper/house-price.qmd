@@ -1,0 +1,433 @@
+---
+title: "An analysis of house prices in Beijing using linear regression model"
+author: 
+  - Yiyi Yao
+thanks: "Code and data are available at: https://github.com/Yaoee111/house-price.git. DOI available at: DOI 10.17605/OSF.IO/JS83Y."
+date: "11 April 2024"
+date-format: long
+abstract: "This study investigates the influence of property size, location, and type on housing prices in Beijing over the past decade. Employing linear regression analysis on a comprehensive dataset of property transactions from 2011 to 2017, the research highlights the growing importance of technological integration alongside traditional market drivers like size and location. This paper provides crucial insights for stakeholders looking to navigate the evolving dynamics of urban real estate markets, offering a basis for future policy and development strategies in the sector."
+format: pdf
+number-sections: true
+bibliography: references.bib
+---
+
+```{r}
+#| include: false
+#| warning: false
+#| message: false
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(kableExtra)
+library(knitr)
+library(tibble)
+library(stats)
+library(broom)
+```
+
+# Introduction
+
+Beijing, as the capital of China, is an international metropolis integrating economy and politics, trends and culture. In recent years, the difficulty of buying a home has become a major problem for young Chinese people (@yan2010house). And Beijing's housing prices have been high and rising for many years (@zhang2018contributes). I have selected a comprehensive set of data containing ten years' worth of housing transactions in Beijing, in the hope that it will provide an in-depth study of the pattern of Beijing's housing prices. This study examines the impact of various factors such as real estate size, location, and technological amenities on Beijing's house prices, filling a significant gap in current research that tends to ignore the impact of modern technological integration and changing demographic trends on real estate values.
+
+This paper adopts a linear regression analysis method to study the impact of different variables on house prices using a comprehensive dataset of ten years of real estate transactions in Beijing (@liu2021determinants). The methodology takes into account not only traditional factors such as size and location, but also new influences such as housing configuration, aiming to paint a detailed picture of the drivers of current market trends. The results of the study show that the market has changed significantly, with technological amenities becoming an important factor in determining property values in addition to traditional factors.
+
+My estimand is finding effects of property size, location, and type of building on the total price of housing in Beijing. Specifically, we aim to fit a linear regression model to predict the house prices.
+
+The rest of the paper is organized as follows: The [@sec-data] describes the data, variables, and methods used in the study and the rationale for the selection of this dataset. The data is presented through graphs. The [@sec-model] describes how to fit a linear regression model. The [@sec-results] presents the results of the analysis. The [@sec-discussion] provides an in-depth discussion of our findings and reflections on the research process. Finally, the [@sec-appendix] adds details of the models.
+
+
+
+# Data {#sec-data}
+
+## Overview
+
+This dataset, sourced from Kaggle, provides a comprehensive collection of housing price records in Beijing from 2011 to 2017 (with some transactions recorded as early as 2009 and as late as January 2018). This data was primarily fetching from Lianjia, which is a Chinese house trading platform.
+
+## Data Management
+
+I use the statistical programming language `R` [@citeR]. In the data analysis and visualization process, I also made use of the following `R` packages: `readr` [@citereadr], `dplyr` [@citedplyr], `knitr` [@citeknitr], `kableExtra` [@citekExtra], `ggplot2` [@citeggplot2], `stringr` [@citestringr], `broom` [@citebroom], `tibble` [@citetibble], `stats` [@citestats].
+
+
+## Variable
+
+This dataset contains detailed variables for evaluating each property. I will focus on some most vital variables. Details are in (@tbl-data1)
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| label: "tbl-data1"
+#| tbl-cap: Key Variables in the Beijing Housing Price Dataset 
+
+# Create a tibble with variables and their descriptions
+variable_descriptions <- tibble(
+  "Variable" = c("tradeTime", "DOM", "followers", "totalPrice", "price", "square",
+               "livingRoom", "drawingRoom", "kitchen", "bathroom", "floor",
+               "buildingType", "constructionTime", "renovationCondition",
+               "buildingStructure", "ladderRatio", "elevator", "fiveYearsProperty"),
+  "Description" = c("The time of transaction",
+                  "Active days on market",
+                  "The number of people following the transaction",
+                  "The total price",
+                  "The average price by square",
+                  "The square of house",
+                  "The number of living rooms",
+                  "The number of drawing rooms",
+                  "The number of kitchens",
+                  "The number of bathrooms",
+                  "The height of the house",
+                  "Including tower (1), bungalow (2), combination of plate and tower (3), plate (4)",
+                  "The time of construction",
+                  "Including other (1), rough (2), simplicity (3), hardcover (4)",
+                  "Including unknown (1), mixed (2), brick and wood (3), brick and concrete (4), steel (5), steel-concrete composite (6)",
+                  "The proportion between number of residents on the same floor and number of elevator of ladder. It describes how many ladders a resident have on average.",
+                  "Have (1) or not have elevator (0)",
+                  "If the owner has the property for less than 5 years")
+)
+
+variable_descriptions |>
+  kable(booktabs = TRUE) |>
+  column_spec(2, width = "41em")|>
+  kable_styling(font_size = 9, latex_options = "hold_position")
+```
+
+## Rationale for Selection
+
+The selection of this dataset for modeling house prices in Beijing is based on several compelling reasons:
+
+- This dataset contains a broad range of critical determinants of housing prices, including location, size (square meters), and the number of rooms (living, drawing, kitchen, bathroom). These variables are well-established and easy to read.
+
+- With trade data spanning from 2011 to 2017 and some records from 2018, this dataset offers a historical perspective on the market, allowing for the analysis of trends over time.
+
+- The dataset is sourced from Lianjia, which is one of the biggest platform in Chinese house trading market. Thus, we can trust in the quality and reliability of these data.
+
+## Limitation
+
+While this dataset provides valuable information for modeling, it also has limitations that could impact the analysis:
+
+- It exists missing or incomplete records, such as days on market (DOM) or construction time, which could reduce the dataset's overall utility and may introduce bias.
+
+- As the dataset covers transactions up to 2017 (with some from 2018), the data might not reflect current market conditions, which are influenced by recent economic and policy changes.
+
+## Data cleaning and preparation
+
+In preparing the Beijing house prices dataset for analysis, I first cleaned the data to enhance data integrity and usability. We started by stripping non-numeric characters from variables such as 'floor', where only the numerical floor levels were retained. Further, I filtered out rows with invalid entries in key columns like 'buildingType' and 'constructionTime'. The dataset then underwent general cleaning procedures, including the removal of missing values and duplicate records. This process aimed to mitigate any potential biases and provide a foundation for the predictive modeling of Beijing's house prices. Also, since the original dataset was too big (318852 rows of data in total), I randomly chose 300 rows for further analysis.
+
+
+## Plots
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| label: fig-data1
+#| fig-cap: Relationship between Total Price and Frequency
+
+data <- read.csv("/cloud/project/data/raw_data/cleaned_house_price.csv")
+
+# 1. Histogram: Relationship between Total Price and Frequency
+ggplot(data, aes(x = totalPrice)) +
+  geom_histogram(binwidth = 50, fill = "blue", color = "black") +
+  labs(title = "Distribution of Total Prices", x = "Total Price", y = "Frequency") +
+  theme_minimal()
+
+```
+
+@fig-data1 shows the distribution of total prices across all properties listed in the dataset. The histogram’s bins are set at intervals of 50 to effectively capture the range and frequency of pricing. Such a plot is useful for identifying the most common price ranges and observing any skewness or outliers in market prices.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| label: fig-data2
+#| fig-cap: Price vs. Property Size
+
+# 2. Scatter Plot: Price vs. Property Size
+ggplot(data, aes(x = square, y = price)) +
+  geom_point(color = "red") +
+  labs(title = "Price vs. Property Size", x = "Property Size (square meters)", y = "Price per Unit") +
+  theme_minimal()
+```
+
+@fig-data2 illustrates the relationship between the size of properties (in square meters) and their unit prices. Each point represents a property, with its position indicating both its size and its price per square meter. This visualization is crucial for analyzing how price per unit area varies with property size, potentially revealing trends like economies of scale or premium pricing for larger properties.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| label: fig-data3
+#| fig-cap: Price vs. Districts
+
+# 3. Scatter Plot: Price vs. Districts
+ggplot(data, aes(x = district, y = price)) +
+  geom_point(aes(color = district), position = position_jitter(width = 0.2, height = 0)) +
+  labs(title = "Price vs. Districts", x = "District", y = "Price per Unit") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+In @fig-data3, each point represents a property, plotted according to its district and the price per square meter. This plot allows for the comparison of price levels across different districts, highlighting variations that might be due to location desirability, availability of amenities, and other socio-economic factors.
+
+
+
+# Model {#sec-model}
+
+The goal of my modelling is twofold. Firstly, I want to Explore the relevance of various variables to house prices. Secondly, I want to fit a linear regression model to predict the house prices, which involves two main phases: feature selection and model development.
+
+Background details are included in [Appendix -@sec-model-details].
+
+## Feature selection
+
+In the context of predicting house prices, the relevance of variables can be assessed through exploratory data analysis (EDA), which includes looking at correlation coefficients between potential predictor variables and the house price (the target variable). I would examine scatter plots for continuous variables and box plots for categorical variables to visualize relationships. Statistical tests help in quantifying the strength of associations. Variables with strong correlations or significant test results could be considered relevant.
+
+## Model set-up
+
+### Linear regression model
+
+To predict house prices,  I will fit a linear regression model. The general form of a linear regression model is:
+$$
+Y = \beta_0 + \beta_1X_{1} + \beta_2X_{2} + \ldots + \beta_nX_{n} + \epsilon
+$$
+where: - $Y$ is the target variable (house price).
+- $X_{1}$, $X_{2}$, ... , $X_{n}$ are the predictor variables (such as square meters, number of rooms).
+- $\beta_{0}$ is the intercept.
+- $\beta_{1}$, $\beta_{2}$, ... , $\beta_{n}$ are the coefficients representing the weight of each predictor.
+- $\epsilon$ is the error term, representing the part of $Y$ the model cannot explain.
+
+Each coefficient indicates how much the target variable is expected to increase when that predictor variable increases by one unit, holding all other predictors constant.
+
+
+## Model justification
+
+Choosing between a linear regression model and a Bayesian model for predicting house prices in Beijing depends on their distinct advantages. A linear regression model is simple and ease for interpretation, and compute in high efficiency. Therefore, it is ideal for initial explorations and for direct understand on how different variables affect house prices.  In terms of results, we can expect linear regression models to provide clear, straightforward estimates of the impact of each factor on house prices.
+
+
+
+# Results {#sec-results}
+
+## visualize relationship between variables
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| label: fig-result1
+#| fig-cap: Total Price v.s. Square Meters
+
+data <- read.csv("/cloud/project/data/raw_data/cleaned_house_price.csv")
+
+ggplot(data, aes(x = square, y = totalPrice)) +
+  geom_point(alpha = 0.5) +
+  labs(x = "Square Meters",
+       y = "Total Price")
+
+```
+
+From the scatter plots (@fig-result1), we look for trends indicating relationships between continuous variables (totalPrice) and square (the size of the property in square meters). We can find a  positive correlation, which appear as an upward trend in the scatter plot. The shape of the plot suggests that as the size of the property increases, so does its price.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| label: fig-result2
+#| fig-cap: Total Price by Building Type
+
+data$buildingType <- as.factor(data$buildingType)  # Ensure buildingType is treated as a categorical variable
+ggplot(data, aes(x = buildingType, y = totalPrice)) +
+  geom_boxplot() +
+  labs(x = "Building Type",
+       y = "Total Price")
+```
+The box plot (@fig-result2) for categorical variables, like buildingType, provides insights into how the prices are distributed across different types of buildings. For example, differences in median prices, the presence of outliers, and the spread of prices within each category can reveal which types of buildings tend to be more expensive or show greater variability in prices.\
+
+
+## Visualize linear regression model
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| label: fig-result3
+#| fig-cap: Linear Regression of Total Price on Square Meters
+
+data <- read.csv("/cloud/project/data/raw_data/cleaned_house_price.csv")
+
+# Fit the linear regression model
+model <- lm(totalPrice ~ square, data = data)
+
+# Revised plot with a descriptive legend
+ggplot(data, aes(x = square, y = totalPrice)) + 
+  geom_point(aes(color = 'Data Points'), alpha = 0.5) +
+  geom_smooth(method = "lm", se = TRUE, aes(color = 'Regression Line')) +
+  labs(x = "Square Meters",
+       y = "Total Price",
+       color = "Legend") +
+  scale_color_manual(values = c('Data Points' = 'blue', 'Regression Line' = 'red')) +
+  theme_minimal()
+
+```
+@fig-result3 clearly visualizes the relationship between property size and total price in the Beijing housing market. Each blue dot in the graph represents an individual property. It is positioned according to its square meterage and corresponding total price. The collection of these points forms a scatterplot shape, indicating a trend of data concentration.
+
+The red regression line is visually dominant and it is a statistical tool. It indicates the best linear fit to the data points based on the least squares method. This line indicates the average effect of the size of a property on its price, demonstrating the direct relationship that the larger the size of a property, the higher the price.
+
+A gray shaded area around the regression line indicates the standard error of the estimates. This shaded band highlights the variability and uncertainty inherent in the regression estimates. It reflects the extent to which actual prices deviate from the predicted prices based on square meters alone.
+
+
+## Model summary
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| lable: tbl-result1
+#| tbl-cap: Linear regression model
+
+linear_model <- lm(totalPrice ~ square + floor + buildingType, data = data)
+
+linear_model_summary <- tidy(linear_model)
+
+linear_model_summary
+```
+
+The linear regression model offers a quantitative analysis of how various factors such as square footage, floor level, and building type impact the total price of houses in Beijing. For instance, the coefficient for square footage indicates a positive relationship, suggesting that as the size of the property increases, so does the price, which aligns with common real estate market expectations. Similarly, higher floors might command higher prices due to preferred views and reduced noise, reflected in the positive coefficient for the floor variable. The impact of building type, quantified through its coefficient, reveals how different types of constructions compare in terms of market valuation, potentially showing preferences for modern over traditional styles, or high-rises over bungalows, depending on the coefficient values.
+
+Additionally, the R-squared value of the model, which measures the proportion of variance in house prices explained by the independent variables, provides an overall assessment of the model's explanatory power. A higher R-squared value would indicate that the model does an excellent job in capturing the variations in house prices based on the included features. This metric, along with the significance levels (p-values) of the individual coefficients, helps in evaluating the reliability and robustness of the model. If certain variables show non-significant p-values, they may not be as influential in determining house prices as initially thought, prompting further investigation or reconsideration of these factors in the model. Thus, the linear regression analysis not only aids in understanding specific factor influences but also in assessing the overall effectiveness of the model in explaining real estate pricing dynamics in Beijing.
+
+
+## New dataset
+
+After all these analysis, I create a new dataset considering the price change in the house market of Beijing [Appendix -@sec-new-dataset]. 
+
+
+# Discussion {#sec-discussion}
+
+## Things we have done in this paper
+
+In this paper, I provide a comprehensive analysis of Beijing's housing market, focusing on the relationship between the size of a home in square meters and its total selling price. My goal is to understand the drivers of property values in one of the most populous cities in the world. I use a dataset containing several years of sales data to analyze the impact of property attributes on pricing.
+
+In this paper, we meticulously clean the dataset by removing all non-numeric characters and irrelevant data points to ensure the integrity of the analysis. I then graph the data to visualize trends and patterns to pave the way for more formal econometric modeling.
+
+In this paper, we construct and refine a linear regression model to make it a predictive tool for analyzing the Beijing housing market. First, I identify hypothetical variables that affect housing prices based on economic theory and previous empirical studies. The main independent variable I focus on is the size of the property in square meters because it is a recognized determinant of housing value. In addition to area, other control variables are included to account for factors such as property floor and building type, categorical variables that reflect the diversity of urban housing options.
+
+ 
+## Something we learn about the world
+
+Probably the first important takeaway from this paper is the confirmation of a predictable trend in the real estate market - the larger the area, the higher the price of the property. This finding coincides with conventional wisdom, but grounding it in statistical analysis adds weight to the empirical analysis. It shows how market dynamics respond predictably to property characteristics, providing insights into how consumers value space in urban settings.
+
+Second, as the difference near the regression line shows, area alone cannot explain price changes. This suggests that there are other factors at play in determining property values, potentially leading to a discussion of the desirability of location, market volatility, or other attributes unrelated to square footage that influence buyers' decisions.
+
+
+## Weaknesses
+
+The analysis in this paper, while reliable in many respects, has its limitations. One obvious weakness is the model's reliance on historical sales data, which may not fully reflect current or future market trends. The dynamic nature of the real market means that past relationships between variables do not necessarily apply to the future, especially in the context of rapid urban growth and changing economic conditions.
+
+Another limitation is the assumption of linearity inherent in regression models. Real-world data often exhibit nonlinear relationships, and while linear regression is a powerful predictive tool, it may oversimplify the complex interactions between the various factors that determine house prices. In addition, our model may suffer from omitted variable bias because other influences such as the quality of nearby schools, the economic status of the neighborhood, or even intangible factors such as architectural style or neighborhood ambiance may not be included in the dataset.
+
+The model also assumes that the relationship between square meters and total price is constant across all size and price levels, which may not be the case in a heterogeneous market like Beijing. For example, the relationship between price per square meter may be different for luxury homes versus ordinary homes.
+
+In addition, this paper does not focus on spatial analysis, which is particularly relevant to the real market because geographic location can have a huge impact on property values. Spatial autocorrelation, where the value of a property is correlated with the value of neighboring properties, was not addressed in this paper, which could bias the results and lead to biased coefficient estimates.
+
+
+## Next steps
+
+The insights gained from the current analysis of the Beijing housing market still have much to be expanded. One area for further research is the integration of additional predictor variables to capture the multifaceted nature of real estate valuations, such as neighborhood crime rates, green space proximity and accessibility to public services. Incorporating these factors could lead to a better understanding of differences in housing prices.
+
+Advances in geospatial analysis offer another frontier for exploration. Given the possibility of spatial autocorrelation, the application of geographically weighted regression models can assess how location-specific factors affect housing prices. These models can reveal how the desirability of certain areas drives the market and how this influence changes across the urban landscape.
+
+Incorporating temporal dynamics is also critical. Real estate markets change in response to economic cycles, urban development policies, and demographics. Valuable predictive insights can be gained through longitudinal studies that examine housing prices over time, particularly in response to policy changes or major economic events.
+
+Finally, there is room to explore the behavioral aspects of real estate transactions. Qualitative research on the motivations, value perceptions, and decision-making processes of buyers and sellers can complement quantitative models and provide a comprehensive view of the market. This human dimension is particularly important in a rapidly urbanizing context such as Beijing, where housing is not only an economic commodity but also an important component of social welfare.
+
+
+
+
+
+\newpage
+
+\appendix
+
+# Appendix {#sec-appendix}
+
+## Model details {#sec-model-details}
+
+```{r}
+#| label: fig-app
+#| fig-cap: Residuals from the simple linear regression
+#| fig-subcap: ["Histogram of Residuals", "Residuals vs. Square Footage", "Residuals vs. Floor Level", "Fitted vs. Actual Prices"]
+#| echo: false
+#| warning: false
+#| layout-ncol: 2
+
+data <- read.csv("/cloud/project/data/raw_data/cleaned_house_price.csv")
+
+# Fit the linear regression model
+model <- lm(totalPrice ~ square + floor + buildingType, data = data)
+
+# Calculate residuals and fitted values
+data$.resid <- resid(model)
+data$.fitted <- fitted(model)
+
+
+#a) Histogram of Residuals
+ggplot(data, aes(x = .resid)) +
+  geom_histogram(binwidth = 20) +
+  theme_classic() +
+  labs(y = "Frequency", x = "Residuals")
+
+
+#b) Residuals vs. Square Footage
+ggplot(data, aes(x = square, y = .resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dotted", color = "grey") +
+  theme_classic() +
+  labs(y = "Residuals", x = "Square Footage (square meters)")
+
+
+#c) Residuals vs. Floor Level
+ggplot(data, aes(x = floor, y = .resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dotted", color = "grey") +
+  theme_classic() +
+  labs(y = "Residuals", x = "Floor Level")
+
+
+#d) Fitted vs. Actual Prices
+ggplot(data, aes(x = totalPrice, y = .fitted)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "darkgrey") +
+  theme_classic() +
+  labs(y = "Fitted Prices", x = "Actual Total Prices")
+
+```
+In @fig-app:
+- picture (a): the residuals are normally distributed, centered around zero, indicating a good fit.
+- picture (b) & (c): These plots help to check for any patterns in residuals across the values of square footage and floor level, respectively. The absence of patterns (e.g., no funnel shape or increasing/decreasing trends) suggests that the model fits well across different values of these predictors.
+- Picture (d): This plot checks how well the predicted values from the model match the actual values.
+
+## new dataset {#sec-new-dataset}
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+
+
+# Read the data
+data <- read_csv("/cloud/project/data/raw_data/cleaned_house_price.csv")
+
+# Create a new dataset with specified columns
+selected_columns <- c("totalPrice", "price", "square", "floor", "buildingType", "constructionTime")
+new_data <- data[, selected_columns, drop = FALSE]
+
+
+# Write the processed data back to new CSV files using appropriate paths
+write_csv(new_data, "/cloud/project/data/analysis_data/new_house_price.csv")
+
+```
+
+The newly created CSV file, new_house_price_dataset.csv, is a curated dataset derived from a larger collection of data concerning the Beijing housing market. This file specifically includes a selection of key variables that are instrumental for analyzing and predicting house prices in Beijing.
+
+# References
+
+
